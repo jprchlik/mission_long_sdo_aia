@@ -56,9 +56,8 @@ def make_images(f):
     bot_l = SkyCoord((x0-(scale1[0]*img_wx/2))*u.arcsec,(y0-(scale1[1]*img_wy/2))*u.arcsec,frame=img[0].coordinate_frame)
 
     
-    #rotate sunpy and cut map
-    for j,i in enumerate(img): img[j] = i.submap(bot_l,top_r).rotate(angle=-90*u.deg)
 
+    #dictionary of images
     img_dict = {} 
     scale = {}
     scale_list = []
@@ -69,6 +68,17 @@ def make_images(f):
     sub_img_size = (img_w,h0)
     #put parameters in a series of dictionaries
     for j,i in enumerate(img):
+
+        #create image position based on index
+        if j == 0:
+            px,py = 0,0
+        elif j == 1:
+            px,py = 0,2048
+        elif j == 2:
+            px,py = 2048,0
+        elif j == 3:
+            px,py = 2048,2048
+
         #color mapping
         icmap = img_scale[wav[j]][0]
         ivmin = img_scale[wav[j]][1]
@@ -150,7 +160,8 @@ def make_images(f):
         #if ((old_size[0] > sub_img_size[0]) | (old_size[0] > sub_img_size[0])):
 
         #img_n = img_n.resize((img_w,h0))
-        new_img.paste(temp_img,(j*img_w,0))
+        #Add image to array of images
+        new_img.paste(temp_img,(px,py))
     
 
     #output file
@@ -224,22 +235,19 @@ def des_cad(start,end,delta):
         yield curr
         curr += delta
 
-#input coordinates and time
-cx=923.47960516
-cy=-190.795771256
-rot_time=datetime(2018,9,10,19,42,45)
-wav = ['0171','0131']
-cad = 36.
+#input wavelengths and cadence
+wav = ['0094','0193','0211','0131']
+cad = timedelta(days=30.)
 
 #Time range to observe
-start = datetime(2018,1,22,1,0,0)
-end   = datetime(2018,1,22,5,0,0)
+start = datetime(2010,5,22,1,0,0)
+end   = datetime.utcnow()
 #start = datetime(2017,9,10,21,50,0)
 #end   = datetime(2017,9,10,21,59,0)
 span = (end-start).total_seconds() #seconds to run the movie over
 sdir = start.strftime('%Y%m%d') 
 #get set cadence to observe 
-real_cad = [result for result in des_cad(start,end,dt(seconds=cad))]
+real_cad = [result for result in des_cad(start,end,cad)]
 
 img_scale = {'0094':[cm.sdoaia94  ,np.arcsinh(1.),np.arcsinh(150.)],
                   '0131':[cm.sdoaia131 ,np.arcsinh(5.),np.arcsinh(3500.)],
@@ -279,18 +287,12 @@ font = ImageFont.truetype("/Library/Fonts/Arial Unicode.ttf", 56)
 font = ImageFont.truetype("/Volumes/Pegasus/jprchlik/anaconda2/lib/python2.7/site-packages/matplotlib/mpl-data/fonts/ttf/DejaVuSans-Bold.ttf", 56)
 
 
-#get box of image
-b_cor = (2896,1360,4096,3260)
-x_c,y_c = 3496,2310
-w_x,w_y = 1900,1200
-b_cor = (x_c-w_x/2,y_c-w_y/2,x_c+w_x/2,y_c+w_y/2)
-
 #number of processors
 n_proc = 8
 
 #image and movie height and width
-wy = 1900
-wx = 1200
+wy = 2048
+wx = 2048
 #Use the longer side to automatically set width
 if wy > wx:
    w0 = wy
@@ -298,9 +300,6 @@ if wy > wx:
 else:
    h0 = wy
    w0 = wx
-
-x0 = 800
-y0 = -167
 
 #testing
 #fits_files = fits_files[170:190]
