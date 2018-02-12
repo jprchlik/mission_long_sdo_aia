@@ -29,162 +29,151 @@ def create_dir(dirs):
 
 
 def make_images(f):
-    global wav,img_scale,wx,wy,x0,y0,h0,w0,sdir
+    global wav,img_scale,wx,wy,h0,w0,sdir
 
-    #width of ind. image
-    img_w = w0/len(wav)
-    if wx > wy:
-       img_wx = wx/len(wav)
-       img_wy = wy
-    else:
-       img_wy = wy/len(wav)
-       img_wx = wx
+    #try to make the image. If it fails just move on
+    try:
+        #width of ind. image
+        img_w = w0/len(wav)
+        if wx > wy:
+           img_wx = wx/len(wav)
+           img_wy = wy
+        else:
+           img_wy = wy/len(wav)
+           img_wx = wx
 
 
-    wavelet = False
+        wavelet = False
 
 
-    #read all images into sunpy maps
-    img = sunpy.map.Map(*f)
+        #read all images into sunpy maps
+        img = sunpy.map.Map(*f)
   
-    #get the scale of the first image and use it to set the FoV
-    scale1 = [img[0].scale[0].value,img[0].scale[1].value]
+        #dictionary of images
+        img_dict = {} 
+        scale = {}
+        scale_list = []
+        #create new image
+        new_img = Image.new('RGB',(w0,h0))
 
-    #clip the images based on scale one
-    top_r = SkyCoord((x0+(scale1[0]*img_wx/2))*u.arcsec,(y0+(scale1[1]*img_wy/2))*u.arcsec,frame=img[0].coordinate_frame)
-    bot_l = SkyCoord((x0-(scale1[0]*img_wx/2))*u.arcsec,(y0-(scale1[1]*img_wy/2))*u.arcsec,frame=img[0].coordinate_frame)
+        #image size of subwindow
+        sub_img_size = (img_w,h0)
+        #put parameters in a series of dictionaries
+        for j,i in enumerate(img):
 
-    
+            #create image position based on index
+            if j == 0:
+                px,py = 0,0
+            elif j == 2:
+                px,py = 0,1024
+            elif j == 1:
+                px,py = 1024,0
+            elif j == 3:
+                px,py = 1024,1024
 
-    #dictionary of images
-    img_dict = {} 
-    scale = {}
-    scale_list = []
-    #create new image
-    new_img = Image.new('RGB',(w0,h0))
+            #color mapping
+            icmap = img_scale[wav[j]][0]
+            ivmin = img_scale[wav[j]][1]
+            ivmax = img_scale[wav[j]][2]
+            #keep list of scale
+            scale = [i.scale[0].value,i.scale[1].value]
 
-    #image size of subwindow
-    sub_img_size = (img_w,h0)
-    #put parameters in a series of dictionaries
-    for j,i in enumerate(img):
+            #set up for wavelet analysis
+            wav_img = i.data
+            f_img = wav_img
 
-        #create image position based on index
-        if j == 0:
-            px,py = 0,0
-        elif j == 1:
-            px,py = 0,2048
-        elif j == 2:
-            px,py = 2048,0
-        elif j == 3:
-            px,py = 2048,2048
+            #do wavelet analysis
+            if wavelet:
+                d_size = 15*4+1
+                #get median filter
+                n_back = medfilt(wav_img,kernel_size=d_size)
+                #subtract median filter
+                img_sub = wav_img-n_back
+                
+                #Use Biorthogonal Wavelet
+                wavelet = 'bior2.6'
+                
+                #use 6 levels
+                n_lev = 6
+                o_wav = pywt.swt2(img_sub, wavelet, level=n_lev )
+                #only use the first 4
+                f_img = pywt.iswt2(o_wav[0:4],wavelet)
+                #Add  wavelet back into image
+                f_img = f_img+wav_img
+                
+                #remove zero values
+                f_img[f_img < 0.] = 0.
 
-        #color mapping
-        icmap = img_scale[wav[j]][0]
-        ivmin = img_scale[wav[j]][1]
-        ivmax = img_scale[wav[j]][2]
-        #keep list of scale
-        scale = [i.scale[0].value,i.scale[1].value]
+            #do normalization
+            b_img = (np.arcsinh(f_img) - ivmin) / (ivmax - ivmin)
+            #format image with color scale
+            img_n = np.array(b_img)
+            #if greater than 1 set to 0.99
+            img_n[img_n > 0.99] = 0.99
+            #print(wav[j],img_n.max(),f_img.max(),np.percentile(f_img,[5.,99]))
+            #img_n[img_n < -.2] = 0.99
+            img_n[img_n < 0.] = 0.
+            img_n = icmap(img_n)
+            img_n = np.uint8(img_n*255)
 
-        #set up for wavelet analysis
-        wav_img = i.data
-        f_img = wav_img
+            if img_n.max() > 255:
+                print(img_n.max())
+                print(img[0].date.strftime('%Y%m%d_%H%M%S'))
+               
 
-        #do wavelet analysis
-        if wavelet:
-            d_size = 15*4+1
-            #get median filter
-            n_back = medfilt(wav_img,kernel_size=d_size)
-            #subtract median filter
-            img_sub = wav_img-n_back
             
-            #Use Biorthogonal Wavelet
-            wavelet = 'bior2.6'
-            
-            #use 6 levels
-            n_lev = 6
-            o_wav = pywt.swt2(img_sub, wavelet, level=n_lev )
-            #only use the first 4
-            f_img = pywt.iswt2(o_wav[0:4],wavelet)
-            #Add  wavelet back into image
-            f_img = f_img+wav_img
-            
-            #remove zero values
-            f_img[f_img < 0.] = 0.
 
-        #do normalization
-        b_img = (np.arcsinh(f_img) - ivmin) / (ivmax - ivmin)
-        #format image with color scale
-        img_n = np.array(b_img)
-        #if greater than 1 set to 0.99
-        img_n[img_n > 0.99] = 0.99
-        #print(wav[j],img_n.max(),f_img.max(),np.percentile(f_img,[5.,99]))
-        img_n[img_n < -.2] = 0.99
-        img_n[img_n < 0.] = 0.
-        img_n = icmap(img_n)
-        img_n = np.uint8(img_n*255)
+            img_n = Image.fromarray(img_n)
+            img_dict[wav[j]] = img_n
 
-        if img_n.max() > 255:
-            print(img_n.max())
-            print(img[0].date.strftime('%Y%m%d_%H%M%S'))
-           
+            #resize image to img0 scale
+            img_n = img_n.resize((1024,1024))
 
+
+            #default image size
+            old_size = img_n.size
+            horizontal_padding = (1024 - old_size[0]) / 2
+            vertical_padding   = (1024 - old_size[1]) / 2
+            temp_img = img_n.crop(
+                (
+                    -horizontal_padding,
+                    -vertical_padding,
+                    old_size[0] + horizontal_padding,
+                    old_size[1] + vertical_padding
+                )
+            )
+
+
+
+
+            #Add image to array of images
+            new_img.paste(temp_img,(px,py))
         
 
-        img_n = Image.fromarray(img_n)
-        img_dict[wav[j]] = img_n
+        #output file
+        outfi = sdir+'/working/panel_{0}'.format(img[0].date.strftime('%Y%m%d_%H%M%S'))+'.png'
 
+        #set scale for plotting 
+        #observed time 
+        obs_time = img[0].date
 
-        #resize image to img0 scale
-        img_n = img_n.resize((int(img_w*scale[0]/scale1[0]),int(h0*scale[1]/scale1[1])))
-
-
-        #default image size
-        old_size = img_n.size
-        horizontal_padding = (img_w - old_size[0]) / 2
-        vertical_padding   = (h0 - old_size[1]) / 2
-        temp_img = img_n.crop(
-            (
-                -horizontal_padding,
-                -vertical_padding,
-                old_size[0] + horizontal_padding,
-                old_size[1] + vertical_padding
-            )
-        )
-
-        #if ((old_size[0] < sub_img_size[0]) | (old_size[0] < sub_img_size[0])):
-        #    temp_img = Image.new("RGB",sub_img_size)
-        #    temp_img.paste(img_n,((sub_img_size[0]-old_size[0])/2,
-        #                  (sub_img_size[1]-old_size[1])/2))
-
-        #if ((old_size[0] > sub_img_size[0]) | (old_size[0] > sub_img_size[0])):
-
-        #img_n = img_n.resize((img_w,h0))
-        #Add image to array of images
-        new_img.paste(temp_img,(px,py))
-    
-
-    #output file
-    outfi = sdir+'/working/panel_{0}'.format(img[0].date.strftime('%Y%m%d_%H%M%S'))+'.png'
-
-    #set scale for plotting 
-    #observed time 
-    obs_time = img[0].date
-
-    
-    #write on text 
-    w_text = '{0:%Y/%m/%d %H:%M:%S} '.format(obs_time)
-    #add wavelengths
-    for i in wav: w_text += str(int(i))+u'\u212B/'
-    #remove final /
-    w_text = w_text[:-1]
-    
-    
-    #Add text of datetime to image
-    draw = ImageDraw.Draw(new_img)
-    draw.text((10,10),w_text,(255,255,255),font=font)
+        
+        #write on text 
+        w_text = '{0:%Y/%m/%d %H:%M:%S} '.format(obs_time)
+        #add wavelengths
+        for i in wav: w_text += str(int(i))+u'\u212B/'
+        #remove final /
+        w_text = w_text[:-1]
+        
+        
+        #Add text of datetime to image
+        draw = ImageDraw.Draw(new_img)
+        draw.text((10,10),w_text,(255,255,255),font=font)
    
-    #save image
-    new_img.save(outfi) 
+        #save image
+        new_img.save(outfi) 
+    except: 
+        pass
 
 #make sure the input wavelength matches the searched wavelength
 def check_wavelength(fil,wav,archive,xrt=False):
@@ -204,8 +193,8 @@ def check_wavelength(fil,wav,archive,xrt=False):
         #try assuming download format of jsoc files
        # try:
         if str(wav) != 'xrt':
-            date = datetime.strptime(i.strip(archive).split('.')[2][:-3],datefmt)
-            wave = i.strip(archive).split('.')[3]
+            date = datetime.strptime(i.strip(archive).split('.')[0][:-5],datefmt)
+            wave = i.strip(archive).split('_')[2].strip('.fits')
             if int(wave) == int(wav):
                 new_fil.append(i)
                 fil_dat.append(date)
@@ -235,7 +224,7 @@ def des_cad(start,end,delta):
 
 #input wavelengths and cadence
 wav = ['0094','0193','0211','0131']
-cad = timedelta(days=360)
+cad = dt(days=30)
 
 #Time range to observe
 start = datetime(2010,5,22,1,0,0)
@@ -330,7 +319,7 @@ command = command+"-g 8 -coder 1 -profile main -preset faster -qdiff 4 -qcomp 0.
 command = command+"+loop+mv4 -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -subq {1:1d} -me_range 16 "
 command = command+"-keyint_min 1 -sc_threshold 40 -i_qfactor 0.71 -rc_eq 'blurCplx^(1-qComp)' -s '{2:4.0f}x{3:4.0f}' "
 command = command+"-b_strategy 1 -bidir_refine 1 -refs 6 -deblockalpha 0 "
-command = command+"-deblockbeta 0 -trellis 1 -x264opts keyint={1:1d}:min-keyint=1:bframes=1 -threads 2 {0}"
+command = command+"-deblockbeta 0 -trellis 1 -x264opts keyint={1:1d}:min-keyint=1:bframes=1 -threads 8 {0}"
 command = command.format(outf,frate,w0,h0,sdir+'/working/symlinks',mo.lengs,bitr)
 
 run = subprocess.call(['/bin/tcsh','-c',command])
