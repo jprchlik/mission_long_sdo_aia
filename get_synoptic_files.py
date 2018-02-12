@@ -67,7 +67,7 @@ stime = datetime(2010,5,13,0,0,0)
 etime = datetime.utcnow()
 
 #cadence to get observations
-caden = timedelta(days=30)
+caden = timedelta(minutes=30)
 
 #desired cadence for the observations
 real_cad = [result for result in des_cad(stime,etime,caden)]
