@@ -31,7 +31,6 @@ def create_dir(dirs):
 def make_images(f):
     global wav,img_scale,wx,wy,x0,y0,h0,w0,sdir
 
-
     #width of ind. image
     img_w = w0/len(wav)
     if wx > wy:
@@ -198,8 +197,7 @@ def check_wavelength(fil,wav,archive,xrt=False):
     if str(wav) == 'xrt':
         datefmt = 'L1_XRT%Y%m%d_%H%M%S'
     else:
-        datefmt = '%Y%m%dT%H%M%SZ'
-        datefmt = '%Y%m%dT%H%M%S'
+        datefmt = 'AIA%Y%m%d_%H%M'
 
     #retrieve file wavelength and observation time
     for i in fil:
@@ -237,7 +235,7 @@ def des_cad(start,end,delta):
 
 #input wavelengths and cadence
 wav = ['0094','0193','0211','0131']
-cad = timedelta(days=30.)
+cad = timedelta(days=360)
 
 #Time range to observe
 start = datetime(2010,5,22,1,0,0)
@@ -267,15 +265,19 @@ img_scale = {'0094':[cm.sdoaia94  ,np.arcsinh(1.),np.arcsinh(150.)],
 dirlist = [sdir,sdir+'/working',sdir+'/working/symlinks',sdir+'/final']
 for i in dirlist: create_dir(i)
 
+#location of file archive
+arch = 'sdo_archive/'
+
+
 fits_files_temp = []
 #loop over all wavelengths in array
 for i in wav:
     try:
-        fits_files = glob(sdir+'/summed/*'+str(int(i))+'*')
+        fits_files = glob(arch+'*_'+i+'.fits')
     except:
         fits_files = glob(sdir+'/xrt/*fits')
     #make sure the wavelength header agrees with found value
-    fits_files = check_wavelength(fits_files,i,sdir+'/')
+    fits_files = check_wavelength(fits_files,i,arch)
     fits_files_temp.append(fits_files)
 #transpose list array
 fits_files = map(list,zip(*fits_files_temp))
