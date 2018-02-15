@@ -31,6 +31,7 @@ def create_dir(dirs):
 def make_images(f):
     global wav,img_scale,wx,wy,h0,w0,sdir
 
+
     #try to make the image. If it fails just move on
     try:
         #width of ind. image
@@ -48,6 +49,13 @@ def make_images(f):
 
         #read all images into sunpy maps
         img = sunpy.map.Map(*f)
+
+        #output file
+        outfi = sdir+'/working/panel_{0}'.format(img[0].date.strftime('%Y%m%d_%H%M%S'))+'.png'
+
+        #skip if file exists exit
+        if os.path.isfile(outfi):
+            return
   
         #dictionary of images
         img_dict = {} 
@@ -150,8 +158,6 @@ def make_images(f):
             new_img.paste(temp_img,(px,py))
         
 
-        #output file
-        outfi = sdir+'/working/panel_{0}'.format(img[0].date.strftime('%Y%m%d_%H%M%S'))+'.png'
 
         #set scale for plotting 
         #observed time 
@@ -224,7 +230,7 @@ def des_cad(start,end,delta):
 
 #input wavelengths and cadence
 wav = ['0094','0193','0211','0131']
-cad = dt(days=30)
+cad = dt(minutes=30)
 
 #Time range to observe
 start = datetime(2010,5,22,1,0,0)
@@ -262,14 +268,16 @@ fits_files_temp = []
 #loop over all wavelengths in array
 for i in wav:
     try:
-        fits_files = glob(arch+'*_'+i+'.fits')
+        #fits_files = glob(arch+'*_'+i+'.fits')
+        fits_files = [j.strftime(arch+'AIA%Y%m%d_%H%M_'+i+'.fits') for j in real_cad]
     except:
         fits_files = glob(sdir+'/xrt/*fits')
     #make sure the wavelength header agrees with found value
-    fits_files = check_wavelength(fits_files,i,arch)
+    #fits_files = check_wavelength(fits_files,i,arch)
     fits_files_temp.append(fits_files)
 #transpose list array
 fits_files = map(list,zip(*fits_files_temp))
+print(len(fits_files))
 
 
 #use font
